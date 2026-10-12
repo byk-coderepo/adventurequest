@@ -1,0 +1,307 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8"/>
+<meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0"/>
+<title>Winner Picks Dinner</title>
+<style>
+  * { box-sizing: border-box; margin: 0; padding: 0; -webkit-tap-highlight-color: transparent; }
+  body { font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', sans-serif; background: #F5F5F7; color: #1C1C1E; min-height: 100vh; }
+  #app { max-width: 430px; margin: 0 auto; min-height: 100vh; padding-bottom: 32px; }
+  .header { padding: 18px 16px 8px; }
+  .eyebrow { font-size: 11px; font-weight: 800; letter-spacing: 0.1em; text-transform: uppercase; color: #8E8E93; }
+  h1 { font-size: 26px; font-weight: 800; margin-top: 2px; }
+  .sub { font-size: 14px; color: #636366; margin-top: 4px; }
+
+  .grid { display: grid; grid-template-columns: 1fr 1fr; gap: 10px; padding: 14px 12px 0; }
+  .loc {
+    border: none; border-radius: 18px; padding: 18px 12px; color: #fff; font: inherit;
+    font-size: 15px; font-weight: 800; text-align: left; cursor: pointer; min-height: 84px;
+    box-shadow: 0 2px 12px rgba(0,0,0,0.12); transition: transform 0.12s;
+  }
+  .loc:active { transform: scale(0.97); }
+  .loc.wide { grid-column: span 2; }
+  .loc small { display: block; font-weight: 600; opacity: 0.85; margin-top: 4px; font-size: 12px; }
+
+  .bar { display: flex; align-items: center; justify-content: space-between; padding: 12px 16px 0; }
+  .back { background: none; border: none; color: #007AFF; font: inherit; font-size: 15px; font-weight: 700; cursor: pointer; }
+  .loc-name { font-size: 15px; font-weight: 800; }
+
+  .seg { display: flex; margin: 12px 12px 0; background: #E5E5EA; border-radius: 12px; padding: 3px; }
+  .seg button {
+    flex: 1; border: none; background: none; padding: 9px 4px; border-radius: 10px;
+    font: inherit; font-size: 13px; font-weight: 700; color: #636366; cursor: pointer;
+  }
+  .seg button.on { background: #fff; color: #1C1C1E; box-shadow: 0 1px 4px rgba(0,0,0,0.12); }
+
+  .wheel-wrap { position: relative; width: 320px; max-width: 92vw; margin: 18px auto 0; aspect-ratio: 1; }
+  canvas { width: 100%; height: 100%; display: block; }
+  .pointer {
+    position: absolute; top: -6px; left: 50%; transform: translateX(-50%);
+    width: 0; height: 0; border-left: 14px solid transparent; border-right: 14px solid transparent;
+    border-top: 26px solid #1C1C1E; filter: drop-shadow(0 2px 2px rgba(0,0,0,0.3)); z-index: 2;
+  }
+  .actions { display: flex; gap: 10px; padding: 18px 12px 0; }
+  .btn {
+    flex: 1; border: none; border-radius: 16px; padding: 15px; font: inherit; font-size: 16px; font-weight: 800;
+    cursor: pointer; transition: transform 0.12s, opacity 0.2s;
+  }
+  .btn:active { transform: scale(0.97); }
+  .btn:disabled { opacity: 0.5; }
+  .btn.primary { background: #007AFF; color: #fff; }
+  .btn.secondary { background: #fff; color: #1C1C1E; box-shadow: 0 1px 6px rgba(0,0,0,0.1); flex: 0 0 auto; padding: 15px 18px; }
+
+  .result {
+    margin: 16px 12px 0; background: #fff; border-radius: 22px; padding: 20px 18px;
+    box-shadow: 0 2px 16px rgba(0,0,0,0.09); text-align: center; animation: pop 0.35s cubic-bezier(0.34,1.56,0.64,1);
+  }
+  @keyframes pop { from { opacity: 0; transform: scale(0.92); } to { opacity: 1; transform: scale(1); } }
+  .result .label { font-size: 11px; font-weight: 800; letter-spacing: 0.1em; text-transform: uppercase; color: #8E8E93; }
+  .result .name { font-size: 26px; font-weight: 800; margin: 6px 0 4px; }
+  .result .meta { font-size: 13px; color: #636366; }
+  .result .links { display: flex; gap: 8px; margin-top: 14px; }
+  .result a, .result button.sm {
+    flex: 1; text-decoration: none; text-align: center; border: none; font: inherit; font-size: 13px; font-weight: 700;
+    padding: 10px 6px; border-radius: 12px; background: #F2F2F7; color: #007AFF; cursor: pointer;
+  }
+  .result button.sm.danger { color: #FF3B30; }
+  .note { font-size: 12px; color: #8E8E93; text-align: center; padding: 18px 20px 0; line-height: 1.5; }
+  .empty { text-align: center; padding: 40px 20px; color: #636366; }
+  .hidden { display: none; }
+</style>
+</head>
+<body>
+<div id="app">
+  <div id="home">
+    <div class="header">
+      <div class="eyebrow">Walt Disney World</div>
+      <h1>Winner Picks Dinner</h1>
+      <div class="sub">Pick a location, spin the wheel, and eat wherever it lands.</div>
+    </div>
+    <div class="grid" id="locGrid"></div>
+    <div class="note">Restaurant lists are a starting point. Menus, hours, and closures change, so confirm in the My Disney Experience app before you go.</div>
+  </div>
+
+  <div id="picker" class="hidden">
+    <div class="bar">
+      <button class="back" id="backBtn">‹ Locations</button>
+      <div class="loc-name" id="locName"></div>
+    </div>
+    <div class="seg" id="seg">
+      <button data-f="all" class="on">All</button>
+      <button data-f="ts">Table Service</button>
+      <button data-f="qs">Quick Service</button>
+    </div>
+    <div class="wheel-wrap">
+      <div class="pointer"></div>
+      <canvas id="wheel" width="640" height="640"></canvas>
+    </div>
+    <div class="actions">
+      <button class="btn secondary" id="shuffleBtn" title="Draw a new set of options">Shuffle</button>
+      <button class="btn primary" id="spinBtn">Spin</button>
+    </div>
+    <div id="resultArea"></div>
+    <div class="note" id="poolNote"></div>
+  </div>
+</div>
+
+<script>
+const LOCATIONS = [
+  { id: 'mk', name: 'Magic Kingdom', sub: 'Castle, Frontierland, Main Street', color: '#5856D6',
+    list: [
+      ['Be Our Guest Restaurant','ts','Fantasyland'],['Cinderella\'s Royal Table','ts','Fantasyland'],
+      ['The Plaza Restaurant','ts','Main Street, U.S.A.'],['Tony\'s Town Square Restaurant','ts','Main Street, U.S.A.'],
+      ['The Crystal Palace','ts','Main Street, U.S.A.'],['Liberty Tree Tavern','ts','Liberty Square'],
+      ['Skipper Canteen','ts','Adventureland'],['Jungle Navigation Co. Skipper Canteen','ts','Adventureland'],
+      ['Columbia Harbour House','qs','Liberty Square'],['Pecos Bill Tall Tale Inn and Cafe','qs','Frontierland'],
+      ['Pinocchio Village Haus','qs','Fantasyland'],['Cosmic Ray\'s Starlight Cafe','qs','Tomorrowland'],
+      ['Casey\'s Corner','qs','Main Street, U.S.A.'],['Sleepy Hollow','qs','Liberty Square'],
+      ['Tortuga Tavern','qs','Adventureland']
+    ] },
+  { id: 'ep', name: 'EPCOT', sub: 'World Showcase and Future World', color: '#34AADC',
+    list: [
+      ['Space 220','ts','World Discovery'],['Le Cellier Steakhouse','ts','Canada'],['Biergarten Restaurant','ts','Germany'],
+      ['Coral Reef Restaurant','ts','World Nature'],['Chefs de France','ts','France'],['Monsieur Paul','ts','France'],
+      ['Rose & Crown Dining Room','ts','United Kingdom'],['San Angel Inn Restaurante','ts','Mexico'],['Via Napoli Ristorante e Pizzeria','ts','Italy'],
+      ['Tutto Italia Ristorante','ts','Italy'],['Teppan Edo','ts','Japan'],['Nine Dragons Restaurant','ts','China'],
+      ['Spice Road Table','ts','Morocco'],['Akershus Royal Banquet Hall','ts','Norway'],['Garden Grill Restaurant','ts','World Nature'],
+      ['Sunshine Seasons','qs','World Nature'],['Connections Eatery','qs','World Celebration'],['Regal Eagle Smokehouse','qs','American Adventure'],
+      ['Yorkshire County Fish Shop','qs','United Kingdom'],['Les Halles Boulangerie-Patisserie','qs','France'],['Katsura Grill','qs','Japan']
+    ] },
+  { id: 'hs', name: 'Hollywood Studios', sub: 'Toy Story Land, Galaxy\'s Edge', color: '#FF2D55',
+    list: [
+      ['50\'s Prime Time Cafe','ts','Echo Lake'],['Sci-Fi Dine-In Theater Restaurant','ts','Commissary Lane'],
+      ['Mama Melrose\'s Ristorante Italiano','ts','Grand Avenue'],['The Hollywood Brown Derby','ts','Hollywood Boulevard'],
+      ['Roundup Rodeo BBQ','ts','Toy Story Land'],['Docking Bay 7 Food and Cargo','qs','Galaxy\'s Edge'],
+      ['Ronto Roasters','qs','Galaxy\'s Edge'],['Woody\'s Lunch Box','qs','Toy Story Land'],['Backlot Express','qs','Echo Lake'],
+      ['ABC Commissary','qs','Commissary Lane'],['Fairfax Fare','qs','Hollywood Boulevard']
+    ] },
+  { id: 'ak', name: 'Animal Kingdom', sub: 'Pandora, Africa, Asia', color: '#34C759',
+    list: [
+      ['Tiffins Restaurant','ts','Discovery Island'],['Yak & Yeti Restaurant','ts','Asia'],['Rainforest Cafe','ts','Entrance'],
+      ['Tusker House Restaurant','ts','Africa'],['Satu\'li Canteen','qs','Pandora'],['Flame Tree Barbecue','qs','Discovery Island'],
+      ['Pizzafari','qs','Discovery Island'],['Yak & Yeti Local Foods Cafes','qs','Asia'],['Harambe Market','qs','Africa'],
+      ['Restaurantosaurus','qs','DinoLand U.S.A.']
+    ] },
+  { id: 'ds', name: 'Disney Springs', sub: 'Marketplace, The Landing, West Side', color: '#FF9500', wide: true,
+    list: [
+      ['Raglan Road Irish Pub','ts','The Landing'],['The BOATHOUSE','ts','The Landing'],['Morimoto Asia','ts','The Landing'],
+      ['Chef Art Smith\'s Homecomin\'','ts','The Landing'],['Wine Bar George','ts','The Landing'],['The Edison','ts','The Landing'],
+      ['Jaleo by José Andrés','ts','The Landing'],['Paddlefish','ts','The Landing'],['Frontera Cocina','ts','The Landing'],
+      ['T-REX','ts','The Marketplace'],['Rainforest Cafe','ts','The Marketplace'],['Splitsville Luxury Lanes','ts','West Side'],
+      ['Wolfgang Puck Bar & Grill','ts','West Side'],['Terralina Crafted Italian','ts','The Town Center'],['Maria & Enzo\'s','ts','The Landing'],
+      ['Gideon\'s Bakehouse','qs','The Marketplace'],['D-Luxe Burger','qs','The Town Center'],['Blaze Pizza','qs','The Marketplace'],
+      ['Earl of Sandwich','qs','The Marketplace'],['Chicken Guy!','qs','The Marketplace'],['Summer House on the Lake','ts','The Town Center'],
+      ['Din Tai Fung','ts','The Landing'],['Pizza Ponte','qs','The Marketplace']
+    ] }
+];
+
+const WHEEL_SIZE = 10;
+const COLORS = ['#FF3B30','#FF9500','#FFCC00','#34C759','#00C7BE','#32ADE6','#007AFF','#5856D6','#AF52DE','#FF2D55'];
+const TAU = Math.PI * 2;
+
+const state = { loc: null, filter: 'all', removed: new Set(), items: [], angle: 0, spinning: false, winner: null };
+const $ = id => document.getElementById(id);
+const canvas = $('wheel'), ctx = canvas.getContext('2d');
+
+function buildHome() {
+  $('locGrid').innerHTML = LOCATIONS.map(l =>
+    `<button class="loc ${l.wide ? 'wide' : ''}" style="background:${l.color}" data-id="${l.id}">${l.name}<small>${l.sub}</small></button>`
+  ).join('');
+  $('locGrid').onclick = e => {
+    const b = e.target.closest('.loc'); if (!b) return;
+    openLocation(b.dataset.id);
+  };
+}
+
+function openLocation(id) {
+  state.loc = LOCATIONS.find(l => l.id === id);
+  state.filter = 'all';
+  state.removed = new Set();
+  state.winner = null;
+  $('locName').textContent = state.loc.name;
+  document.querySelectorAll('#seg button').forEach(b => b.classList.toggle('on', b.dataset.f === 'all'));
+  $('home').classList.add('hidden');
+  $('picker').classList.remove('hidden');
+  window.scrollTo(0, 0);
+  draw();
+}
+
+function pool() {
+  return state.loc.list.filter(r => !state.removed.has(r[0]) && (state.filter === 'all' || r[1] === state.filter));
+}
+
+function sample(arr, n) {
+  const a = arr.slice();
+  for (let i = a.length - 1; i > 0; i--) { const j = Math.floor(Math.random() * (i + 1)); [a[i], a[j]] = [a[j], a[i]]; }
+  return a.slice(0, n);
+}
+
+function draw() {
+  state.items = sample(pool(), WHEEL_SIZE);
+  state.angle = 0;
+  state.winner = null;
+  $('resultArea').innerHTML = '';
+  const total = pool().length;
+  $('poolNote').textContent = total
+    ? `${state.items.length} of ${total} options on the wheel. Shuffle draws a new set.`
+    : '';
+  $('spinBtn').disabled = state.items.length < 2;
+  if (state.items.length < 2) {
+    $('resultArea').innerHTML = `<div class="empty">${total === 1 ? 'Only one option left: ' + pool()[0][0] + '.' : 'No options match this filter.'}</div>`;
+  }
+  render();
+}
+
+function render() {
+  const n = state.items.length, W = canvas.width, c = W / 2, r = c - 6;
+  ctx.clearRect(0, 0, W, W);
+  if (!n) return;
+  const seg = TAU / n;
+  ctx.save();
+  ctx.translate(c, c);
+  ctx.rotate(state.angle);
+  for (let i = 0; i < n; i++) {
+    ctx.beginPath(); ctx.moveTo(0, 0);
+    ctx.arc(0, 0, r, i * seg - Math.PI / 2, (i + 1) * seg - Math.PI / 2);
+    ctx.closePath();
+    ctx.fillStyle = COLORS[i % COLORS.length]; ctx.fill();
+    ctx.strokeStyle = '#fff'; ctx.lineWidth = 4; ctx.stroke();
+    ctx.save();
+    ctx.rotate(i * seg + seg / 2 - Math.PI / 2);
+    ctx.textAlign = 'right'; ctx.fillStyle = '#fff';
+    ctx.font = '800 26px -apple-system, Segoe UI, sans-serif';
+    ctx.shadowColor = 'rgba(0,0,0,0.35)'; ctx.shadowBlur = 4;
+    let t = state.items[i][0];
+    while (ctx.measureText(t).width > r - 70 && t.length > 4) t = t.slice(0, -2).trimEnd() + '…';
+    ctx.fillText(t, r - 22, 9);
+    ctx.restore();
+  }
+  ctx.restore();
+  ctx.beginPath(); ctx.arc(c, c, 34, 0, TAU); ctx.fillStyle = '#fff'; ctx.fill();
+  ctx.strokeStyle = '#E5E5EA'; ctx.lineWidth = 3; ctx.stroke();
+}
+
+function spin() {
+  if (state.spinning || state.items.length < 2) return;
+  state.spinning = true;
+  $('spinBtn').disabled = true; $('shuffleBtn').disabled = true;
+  $('resultArea').innerHTML = '';
+  const n = state.items.length, seg = TAU / n;
+  const idx = Math.floor(Math.random() * n);
+  // Segment i is centered at angle (i * seg + seg/2 - PI/2) before rotation (pointer sits at -PI/2).
+  // Choose a final rotation that brings segment idx's center under the pointer, plus extra full turns.
+  const jitter = (Math.random() - 0.5) * seg * 0.7;
+  const target = -(idx * seg + seg / 2) - jitter;
+  const spins = 5 + Math.floor(Math.random() * 3);
+  const start = state.angle % TAU;
+  let end = target - spins * TAU;
+  while (end > start - 4 * TAU) end -= TAU;
+  const dur = 4800, t0 = performance.now();
+  const ease = t => 1 - Math.pow(1 - t, 4);
+  (function frame(now) {
+    const p = Math.min(1, (now - t0) / dur);
+    state.angle = start + (end - start) * ease(p);
+    render();
+    if (p < 1) return requestAnimationFrame(frame);
+    state.spinning = false;
+    $('spinBtn').disabled = false; $('shuffleBtn').disabled = false;
+    state.winner = state.items[idx];
+    showResult();
+  })(t0);
+}
+
+function showResult() {
+  const [name, type, area] = state.winner;
+  const q = encodeURIComponent(`${name} ${state.loc.name} Walt Disney World`);
+  $('resultArea').innerHTML = `
+    <div class="result">
+      <div class="label">Tonight's dinner</div>
+      <div class="name">${name}</div>
+      <div class="meta">${type === 'ts' ? 'Table service' : 'Quick service'} · ${area}</div>
+      <div class="links">
+        <a href="https://www.google.com/maps/search/${q}" target="_blank" rel="noopener">Map</a>
+        <a href="https://www.google.com/search?q=${encodeURIComponent(name + ' menu Walt Disney World')}" target="_blank" rel="noopener">Menu</a>
+        <button class="sm danger" id="vetoBtn">Veto</button>
+      </div>
+    </div>`;
+  $('vetoBtn').onclick = () => { state.removed.add(name); draw(); };
+}
+
+$('spinBtn').onclick = spin;
+$('shuffleBtn').onclick = () => { if (!state.spinning) draw(); };
+$('backBtn').onclick = () => {
+  if (state.spinning) return;
+  $('picker').classList.add('hidden'); $('home').classList.remove('hidden');
+};
+$('seg').onclick = e => {
+  const b = e.target.closest('button'); if (!b || state.spinning) return;
+  state.filter = b.dataset.f;
+  document.querySelectorAll('#seg button').forEach(x => x.classList.toggle('on', x === b));
+  draw();
+};
+
+buildHome();
+</script>
+</body>
+</html>
